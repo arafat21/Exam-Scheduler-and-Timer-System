@@ -1,6 +1,6 @@
 let allExams = [];
-let currentView = 'ongoing'; //upcoming also
-let countdownIntervals = new Map(); //key:element ID,value:interval ID
+let currentView = 'ongoing'; // or 'upcoming'
+let countdownIntervals = new Map(); // key: element ID, value: interval ID
 
 
 async function gettime() {
@@ -51,9 +51,8 @@ function playNotificationSound() {
 }
 
 
-//API Service Module
+// API Service Module - Handles all backend communication
 const ExamService = {
-    //Fetches all exams from the database 
     getAllExams: async function () {
         try {
             const response = await fetch('http://localhost:3000/api/exams');
@@ -65,7 +64,6 @@ const ExamService = {
         }
     },
 
-    //Create exam
     createExam: async function (examData) {
         await fetch('http://localhost:3000/api/exams', {
             method: 'POST',
@@ -74,8 +72,6 @@ const ExamService = {
         });
     },
 
-    // Cancel any existing exam
-    
     cancelExam: async function (course, examNo, batch) {
         try {
             const response = await fetch(
@@ -90,7 +86,7 @@ const ExamService = {
         }
     },
 
-    //Reschedule the exam
+
     rescheduleExam: async function (course, examNo, batch, newDate, newTime) {
         try {
             const response = await fetch(
@@ -109,7 +105,6 @@ const ExamService = {
         }
     },
 
-    //Update the exam duration
     updateDuration: async function (course, examNo, batch, newDuration) {
         try {
             const response = await fetch(
@@ -129,13 +124,10 @@ const ExamService = {
     }
 };
 
-//UI Controller
+// UI Controller - Handles all UI interactions
 const ExamController = {
 
 
-
-
-    //load and display exam
     loadExams: async function () {
         try {
             const [exams, timeData] = await Promise.all([
@@ -150,12 +142,12 @@ const ExamController = {
 
             for (const exam of exams) {
                 try {
-                    //Get raw date and time
-                    const rawDate = new Date(exam.exam_date); 
+                    // Get raw date and time
+                    const rawDate = new Date(exam.exam_date); // already parsed as ISO
                     const examDateStr = `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, '0')}-${String(rawDate.getDate()).padStart(2, '0')}`;
-                    const startTimeStr = exam.start_time; 
+                    const startTimeStr = exam.start_time; // e.g., '09:00:00'
 
-                    //Construct exam start in UTC
+                    // Construct exam start in UTC (match backend logic)
                     const examStart = new Date(`${examDateStr}T${startTimeStr}Z`);
                     const examEnd = new Date(examStart.getTime() + exam.duration_minutes * 60000);
 
@@ -182,9 +174,6 @@ const ExamController = {
         }
     },
 
-
-
-    //display data on dashboard
     renderExams: async function (exams, timeData) {
         const container = document.getElementById('examContainer');
         container.innerHTML = '';
@@ -199,11 +188,11 @@ const ExamController = {
             card.dataset.batch = exam.batch;
 
 
-            const rawDate = new Date(exam.exam_date); 
+            const rawDate = new Date(exam.exam_date); // already parsed as ISO
             const examDateStr = `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, '0')}-${String(rawDate.getDate()).padStart(2, '0')}`;
-            const startTimeStr = exam.start_time; 
+            const startTimeStr = exam.start_time; // e.g., '09:00:00'
 
-            //Construct exam start in UTC
+            // Construct exam start in UTC (match backend logic)
             const examStart = new Date(`${examDateStr}T${startTimeStr}Z`);
             const examEnd = new Date(examStart.getTime() + exam.duration_minutes * 60000);
 
@@ -251,32 +240,32 @@ const ExamController = {
                     clearInterval(countdownInterval);
                     countdownIntervals.delete(timeLeftId);
                     if (el) {
-                    el.textContent = "0s";
-                    el.style.color = "#dc3545"; 
-                }
+                        el.textContent = "0s";
+                        el.style.color = "#dc3545"; // Final red color
+                    }
                     ExamController.loadExams();
                     return;
                 }
 
                 if (el) {
-                el.textContent = formatRemainingTime(remainingMs);
+                    el.textContent = formatRemainingTime(remainingMs);
 
-                //Change color to red if under 5 minutes
-                if (remainingMs < 5 * 60 * 1000) {
-                    el.style.color = "#dc3545"; 
-                } else {
-                    el.style.color = "#007bff";
+                    //Change color to red if under 5 minutes
+                    if (remainingMs < 5 * 60 * 1000) {
+                        el.style.color = "#dc3545"; //Bootstrap red
+                    } else {
+                        el.style.color = "#007bff"; //Bootstrap blue
+                    }
                 }
-            }
                 remainingMs -= 1000;
             }, 1000);
 
-            //Store the interval
+            // Store the interval
             countdownIntervals.set(timeLeftId, countdownInterval);
 
         });
 
-        this.setupEventListeners(); 
+        this.setupEventListeners(); // Keep using the same listeners
     },
 
 
@@ -307,6 +296,8 @@ const ExamController = {
         <p><strong>Start Time:</strong> ${exam.start_time}</p>
         <p><strong>Duration:</strong> ${exam.duration_minutes} minutes</p>
         <p><strong>End Time:</strong> ${exam.finish_time}</p>
+        <p><strong>Invigilator Name:</strong> ${exam.invigilator_name || 'Not Assigned'}</p>
+        <p><strong>Invigilator Email:</strong> ${exam.invigilator_email || 'Not Provided'}</p>
         <h1 id="${timeLeftId2}" style="font-size: 5em; color: #007bff; margin: 20px 0;">
             ${formatRemainingTime(targetTime - now)}
         </h1>
@@ -314,31 +305,63 @@ const ExamController = {
             <button class="cancel-btn">Cancel</button>
             ${currentView === 'upcoming' ? '<button class="reschedule-btn">Reschedule</button>' : ''}
             <button class="duration-btn">Change Duration</button>
+            <button id="zoomIn" style="background-color: lightgreen;">Zoom In</button>
+            <button id="zoomOut" style="background-color: lightcoral;">Zoom Out</button>
             <button id="backToList" style="background-color: gray;">Back to List</button>
         </div>
     `;
 
         container.appendChild(card);
 
-        //Countdown updater
+        // Countdown updater
         let remainingMs = targetTime - now;
         if (countdownIntervals.has(timeLeftId2)) {
             clearInterval(countdownIntervals.get(timeLeftId2));
             countdownIntervals.delete(timeLeftId2);
         }
 
+        // Zoom functionality
+        let fontSize = 5;  // Default font size
+        const countdownElement = document.getElementById(timeLeftId2);
+        let cardScale = 1;  // Initial scale of the card
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            // Open a new popup window in full-screen mode
+            const zoomWindow = window.open("", "_blank", "width=window.innerWidth,height=window.innerHeight,fullscreen=yes");
+
+            // Create a big timer in the popup window
+            zoomWindow.document.body.innerHTML = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100%; margin: 0;">
+            <h2 id="bigTimer" style="font-size: calc(10vw + 10vh); text-align: center; margin: 0;">${countdownElement.textContent}</h2>
+        </div>
+    `;
+
+            // Get the bigTimer element from the popup window
+            const bigTimer = zoomWindow.document.getElementById("bigTimer");
+
+            // Sync the timer between the full-screen div and the popup window
+            const syncTimer = setInterval(function () {
+                bigTimer.textContent = countdownElement.textContent;
+                bigTimer.style.color=document.getElementById(timeLeftId2).style.color;
+            }, 1000); // Update every second to keep them in sync
+
+            // Optional: Close the zoom window when the popup window is closed
+            zoomWindow.onunload = function () {
+                clearInterval(syncTimer); // Stop syncing the timer when the popup is closed
+            };
+        });
+        const state =(currentView == 'upcoming');
         const countdownInterval = setInterval(() => {
             const el = document.getElementById(timeLeftId2);
             if (remainingMs <= 0) {
                 clearInterval(countdownInterval);
                 if (el) {
                     el.textContent = "0s";
-                    el.style.color = "#dc3545";
+                    el.style.color = "#dc3545"; // Final red color
                 }
 
-                //Detect if it's start or end of exam
+                // Detect if it's start or end of exam
 
-                if (Math.abs(remainingMs) < 5000 && currentView == 'upcoming') {
+                if (Math.abs(remainingMs) < 5000 && state) {
                     showNotification(` ${exam.course_name} exam has started.`);
                 } else if (Math.abs(remainingMs) < 5000) {
                     showNotification(` ${exam.course_name} exam has ended.`);
@@ -352,11 +375,11 @@ const ExamController = {
             if (el) {
                 el.textContent = formatRemainingTime(remainingMs);
 
-                //Change color to red if under 5 minutes
+                // Change color to red if under 5 minutes
                 if (remainingMs < 5 * 60 * 1000) {
-                    el.style.color = "#dc3545";//Bootstrap color code for red 
+                    el.style.color = "#dc3545"; // Bootstrap red
                 } else {
-                    el.style.color = "#007bff"; 
+                    el.style.color = "#007bff"; // Bootstrap blue (default)
                 }
             }
 
@@ -366,8 +389,12 @@ const ExamController = {
 
 
 
-        //Add event listeners for actions
-        card.querySelector('.cancel-btn')?.addEventListener('click', this.handleCancelExam.bind(this));
+        // Add event listeners for actions
+        card.querySelector('.cancel-btn')?.addEventListener('click',  () => {
+            this.handleCancelExam(this);
+            clearInterval(countdownInterval);
+             this.stopPropagation();
+        });
         card.querySelector('.reschedule-btn')?.addEventListener('click', this.showRescheduleForm.bind(this));
         card.querySelector('.duration-btn')?.addEventListener('click', this.showDurationForm.bind(this));
         document.getElementById('backToList').addEventListener('click', () => {
@@ -387,9 +414,6 @@ const ExamController = {
     },
 
 
-    /**
-     * Sets up all event listeners
-     */
     setupEventListeners: function () {
         //Cancel buttons
         document.querySelectorAll('.cancel-btn').forEach(btn => {
@@ -406,32 +430,35 @@ const ExamController = {
             btn.addEventListener('click', this.showDurationForm.bind(this));
         });
 
-        // Form submission
+        //Form submission
         //document.getElementById('examForm').addEventListener('submit', this.handleCreateExam.bind(this));
     },
 
-    //Handles exam cancellation
-    handleCancelExam: async function (e) {
-        e.stopPropagation();
+    handleCancelExam: async function () {
+
+        //e.stopPropagation();
+        
         const exam = await this._getSelectedExamFromExpandedView();
         if (!exam) return;
 
-        
-            try {
-                await ExamService.cancelExam(exam.course_name, exam.exam_no, exam.batch);
-                alert('Exam cancelled successfully!');
-                this.loadExams();
-            } catch (error) {
-                alert(`Failed to cancel exam: ${error.message}`);
-            }
+
+        try {
+            await ExamService.cancelExam(exam.course_name, exam.exam_no, exam.batch);
+            alert('Exam cancelled successfully!');
+            this.loadExams();
+        } catch (error) {
+            alert(`Failed to cancel exam: ${error.message}`);
+        }
     },
 
 
-    //Shows the reschedule form
+    /**
+     * Shows the reschedule form
+     */
     showRescheduleForm: function (e) {
         const card = e.target.closest('.exam-card');
 
-        //Remove existing form if any
+        // Remove existing form if any
         const existing = card.querySelector('.reschedule-form');
         if (existing) existing.remove();
 
@@ -449,7 +476,9 @@ const ExamController = {
         form.querySelector('.cancel-action').addEventListener('click', () => this.loadExams());
     },
 
-    //Handles exam rescheduling
+    /**
+     * Handles exam rescheduling
+     */
     handleRescheduleExam: async function (e) {
         const card = e.target.closest('.exam-card');
         const course = card.dataset.course;
@@ -473,8 +502,6 @@ const ExamController = {
         }
     },
 
-
-    //Shows the duration change form
     showDurationForm: function (e) {
         const card = e.target.closest('.exam-card');
 
@@ -492,7 +519,9 @@ const ExamController = {
     },
 
 
-    //Handles duration update
+    /**
+     * Handles duration update
+     */
     handleUpdateDuration: async function (e) {
         const card = e.target.closest('.exam-card');
         const course = card.dataset.course;
@@ -516,7 +545,9 @@ const ExamController = {
     },
 
 
-    //Handles new exam creation
+    /**
+     * Handles new exam creation
+     */
     handleCreateExam: async function (e) {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -533,9 +564,9 @@ const ExamController = {
     }
 };
 
-//Initialize the application
+// Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    //Attach once here, not in setupEventListeners
+    // Attach once here, not in setupEventListeners
     document.getElementById('examForm').addEventListener('submit', ExamController.handleCreateExam.bind(ExamController));
 
     document.getElementById('ongoingBtn').addEventListener('click', () => {
@@ -554,3 +585,172 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ExamController.loadExams(); // Only once
 });
+// Get the button that will trigger the full-screen div
+const openDivBtn = document.getElementById("openDivBtn");
+
+// Function to create and display the full-screen div
+openDivBtn.onclick = function () {
+    // Create a new div to cover the entire screen
+    const fullScreenDiv = document.createElement("div");
+    fullScreenDiv.classList.add("full-screen-div");
+
+    // Create the content inside the full-screen div
+    const content = document.createElement("div");
+    content.classList.add("full-screen-content");
+
+    // Add content inside the div
+    content.innerHTML = `
+        <h2>Timer</h2>
+        <div class="timer" id="timerDisplay">00:00:00</div>
+        <input type="number" id="timeInput" placeholder="Set Time (Minutes)" />
+        <br>
+        <button id="startPauseBtn">Start</button>
+        <button id="zoomBtn">Zoom</button>
+        <br><br>
+        <label for="increaseMinutes">Increase Time (Minutes):</label>
+        <input type="number" id="increaseMinutes" placeholder="Minutes to Increase" />
+        <button id="increaseTimeBtn">Increase Time</button>
+        <br><br>
+        <label for="decreaseMinutes">Decrease Time (Minutes):</label>
+        <input type="number" id="decreaseMinutes" placeholder="Minutes to Decrease" />
+        <button id="decreaseTimeBtn">Decrease Time</button>
+        <br><br>
+        <button id="closeBtn" class="close-btn">&times;</button>
+    `;
+
+    // Append the content inside the full-screen div
+    fullScreenDiv.appendChild(content);
+
+    // Append the full-screen div to the body
+    document.body.appendChild(fullScreenDiv);
+
+    // Get elements
+    const timerDisplay = document.getElementById("timerDisplay");
+    const timeInput = document.getElementById("timeInput");
+    const startPauseBtn = document.getElementById("startPauseBtn");
+    const zoomBtn = document.getElementById("zoomBtn");
+    const increaseMinutesInput = document.getElementById("increaseMinutes");
+    const decreaseMinutesInput = document.getElementById("decreaseMinutes");
+    const increaseTimeBtn = document.getElementById("increaseTimeBtn");
+    const decreaseTimeBtn = document.getElementById("decreaseTimeBtn");
+    const closeBtn = document.getElementById("closeBtn");
+
+    let countdownInterval;
+    let totalSeconds = 0; // Total time in seconds
+    let isRunning = false;
+
+    // Function to update the timer display
+    function updateTimerDisplay() {
+        let hours = Math.floor(totalSeconds / 3600); // Get hours
+        let minutes = Math.floor((totalSeconds % 3600) / 60); // Get minutes
+        let seconds = totalSeconds % 60; // Get remaining seconds
+        timerDisplay.textContent = `${formatTime(hours)}:${formatTime(minutes)}:${formatTime(seconds)}`;
+    }
+
+    // Helper function to format time as two digits
+    function formatTime(time) {
+        return time < 10 ? `0${time}` : time;
+    }
+
+    // Start or pause the timer
+    startPauseBtn.onclick = function () {
+        if (isRunning) {
+            // Pause the timer
+            clearInterval(countdownInterval);
+            startPauseBtn.textContent = "Resume";
+        } else {
+            // Start the timer
+            if (totalSeconds === 0) {
+                // Get time input value and convert it to total seconds
+                let minutes = parseInt(timeInput.value) || 0;
+                if (minutes <= 0) {
+                    alert("Please enter a valid time!");
+                    return; // Don't start if the input is invalid
+                }
+                totalSeconds = minutes * 60; // Convert minutes to seconds
+            }
+
+            countdownInterval = setInterval(function () {
+                if(totalSeconds<= 300)
+                {
+                    totalSeconds--; // Decrease total seconds
+                    updateTimerDisplay();
+                     timerDisplay.style.color = "#dc3545";
+                }
+                else if (totalSeconds > 0) {
+                    totalSeconds--; // Decrease total seconds
+                    updateTimerDisplay();
+                     timerDisplay.style.color = "#007bff";
+                } else {
+                    clearInterval(countdownInterval);
+                    playNotificationSound();
+                    alert("Time's up!");
+                    startPauseBtn.textContent = "Start"; // Reset the button text
+                }
+            }, 1000); // Update every second
+            startPauseBtn.textContent = "Pause";
+        }
+        isRunning = !isRunning;
+    }
+
+    // Increase time by the specified number of minutes
+    increaseTimeBtn.onclick = function () {
+        let minutesToAdd = parseInt(increaseMinutesInput.value) || 0;
+        if (minutesToAdd > 0) {
+            totalSeconds += minutesToAdd * 60; // Add the specified minutes to the timer
+            updateTimerDisplay(); // Update the display
+        }
+    }
+
+    // Decrease time by the specified number of minutes
+    decreaseTimeBtn.onclick = function () {
+        let minutesToSubtract = parseInt(decreaseMinutesInput.value) || 0;
+        if (minutesToSubtract > 0 && totalSeconds >= minutesToSubtract * 60) {
+            totalSeconds -= minutesToSubtract * 60; // Subtract the specified minutes from the timer
+            updateTimerDisplay(); // Update the display
+        }
+    }
+
+    // Zoom button functionality to open a new window
+    // Zoom button functionality to open a new window
+    zoomBtn.onclick = function () {
+        // Open a new popup window in full-screen mode
+        const zoomWindow = window.open("", "_blank", "width=window.innerWidth,height=window.innerHeight,fullscreen=yes");
+
+        // Create a big timer in the popup window
+        zoomWindow.document.body.innerHTML = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100%; margin: 0;">
+            <h2 id="bigTimer" style="font-size: calc(10vw + 10vh); text-align: center; margin: 0;">${timerDisplay.textContent}</h2>
+        </div>
+    `;
+
+        // Get the bigTimer element from the popup window
+        const bigTimer = zoomWindow.document.getElementById("bigTimer");
+
+        // Sync the timer between the full-screen div and the popup window
+        const syncTimer = setInterval(function () {
+            bigTimer.textContent = timerDisplay.textContent;
+            bigTimer.style.color=document.getElementById("timerDisplay").style.color;
+        }, 1000); // Update every second to keep them in sync
+
+        // Optional: Close the zoom window when the popup window is closed
+        zoomWindow.onunload = function () {
+            clearInterval(syncTimer); // Stop syncing the timer when the popup is closed
+        };
+    }
+
+
+    // Close the overlay when the close button is clicked
+    closeBtn.onclick = function () {
+        clearInterval(countdownInterval); // Stop the timer if it's running
+        fullScreenDiv.remove(); // Remove the div from the DOM
+    }
+
+    // Optionally: Close the div if the user clicks outside the content area
+    fullScreenDiv.onclick = function (event) {
+        if (event.target === fullScreenDiv) {
+            clearInterval(countdownInterval); // Stop the timer if it's running
+            fullScreenDiv.remove(); // Remove the div from the DOM
+        }
+    }
+}
